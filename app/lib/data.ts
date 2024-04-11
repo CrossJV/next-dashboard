@@ -100,21 +100,34 @@ export async function fetchFilteredInvoices(
     const invoices = await sql<InvoicesTable>`
       SELECT
         invoices.id,
-        invoices.amount,
-        invoices.date,
-        invoices.status,
-        customers.name,
-        customers.email,
-        customers.image_url
+        users.name as employee_name,
+        customers.name as customer_name,
+        driver_companies.name as driver_companies_name,
+        invoices.route,
+        invoices.date_ticket,
+        invoices.customer_amount,
+        invoices.date_payment,
+        invoices.date_payment_customer,
+        invoices.transit_cost,
+        invoices.date_payment_transit,
+        invoices.commission,
+        drivers.name as driver_name,
+        invoices.bill_for_customer,
+        invoices.date_income_docs,
+        invoices.date_payment_transit_end,
+        invoices.date_payment_docs
       FROM invoices
-      JOIN customers ON invoices.customer_id = customers.id
+      LEFT JOIN customers ON invoices.customer_fk = customers.id
+      LEFT JOIN drivers ON invoices.driver::INT = drivers.id
+      LEFT JOIN driver_companies ON invoices.drive_company_fk = driver_companies.id
+      LEFT JOIN users ON invoices.employee_fk = users.id
       WHERE
+        users.name ILIKE ${`%${query}%`} OR
         customers.name ILIKE ${`%${query}%`} OR
-        customers.email ILIKE ${`%${query}%`} OR
-        invoices.amount::text ILIKE ${`%${query}%`} OR
-        invoices.date::text ILIKE ${`%${query}%`} OR
-        invoices.status ILIKE ${`%${query}%`}
-      ORDER BY invoices.date DESC
+        driver_companies.name ILIKE ${`%${query}%`} OR
+        invoices.route ILIKE ${`%${query}%`} OR
+        drivers.name ILIKE ${`%${query}%`} 
+      ORDER BY invoices.id ASC
       LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}
     `;
 
@@ -130,13 +143,16 @@ export async function fetchInvoicesPages(query: string) {
   try {
     const count = await sql`SELECT COUNT(*)
     FROM invoices
-    JOIN customers ON invoices.customer_id = customers.id
+    JOIN customers ON invoices.customer_fk = customers.id
+    JOIN drivers ON invoices.driver::INT = drivers.id
+    JOIN driver_companies ON invoices.drive_company_fk = driver_companies.id
+    JOIN users ON invoices.employee_fk = users.id
     WHERE
+      users.name ILIKE ${`%${query}%`} OR
       customers.name ILIKE ${`%${query}%`} OR
-      customers.email ILIKE ${`%${query}%`} OR
-      invoices.amount::text ILIKE ${`%${query}%`} OR
-      invoices.date::text ILIKE ${`%${query}%`} OR
-      invoices.status ILIKE ${`%${query}%`}
+      driver_companies.name ILIKE ${`%${query}%`} OR
+      invoices.route ILIKE ${`%${query}%`} OR
+      drivers.name ILIKE ${`%${query}%`} 
   `;
 
     const totalPages = Math.ceil(Number(count.rows[0].count) / ITEMS_PER_PAGE);
